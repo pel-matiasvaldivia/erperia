@@ -220,6 +220,7 @@ async def get_whatsapp_status():
 async def get_whatsapp_status_tenant(tenant_slug: str):
     """
     Obtiene el estado de la sesión WhatsApp de un tenant específico.
+    Retorna 'disconnected' cuando el tenant no tiene sesión activa en el bot.
     """
     async with httpx.AsyncClient() as client:
         try:
@@ -227,9 +228,16 @@ async def get_whatsapp_status_tenant(tenant_slug: str):
                 f"http://whatsapp-bot:3001/status/{tenant_slug}",
                 timeout=3.0
             )
-            return response.json()
+            # 404 = el bot no tiene sesión para este tenant → desconectado, mostrar QR
+            if response.status_code == 404:
+                return {"status": "disconnected", "qr": None, "tenant_slug": tenant_slug}
+            data = response.json()
+            # Si la respuesta no tiene campo 'status' reconocido, forzar disconnected
+            if data.get("status") not in ("connected", "disconnected", "qr_ready", "connecting"):
+                return {"status": "disconnected", "qr": None, "tenant_slug": tenant_slug}
+            return data
         except Exception:
-            return {"status": "loading", "qr": None, "tenant_slug": tenant_slug}
+            return {"status": "disconnected", "qr": None, "tenant_slug": tenant_slug}
 
 
 @router.post("/logout/{tenant_slug}")

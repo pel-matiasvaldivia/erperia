@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { SearchableSelect } from '../../components/SearchableSelect';
 
 export const WhatsAppAdmin: React.FC = () => {
-  const [status, setStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading');
+  const [status, setStatus] = useState<'connected' | 'disconnected' | 'loading' | 'connecting' | 'qr_ready'>('loading');
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -239,15 +239,22 @@ export const WhatsAppAdmin: React.FC = () => {
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">Vincular Celular</h2>
             </div>
 
-            {status === 'disconnected' ? (
+            {status !== 'connected' ? (
               <div className="space-y-6">
                 <div className="aspect-square bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center p-8 text-center">
-                  {qrCode ? (
+                  {status === 'loading' ? (
+                    <div className="flex flex-col items-center justify-center">
+                      <RefreshCw className="h-12 w-12 text-slate-300 mb-4 animate-spin" />
+                      <p className="text-xs text-slate-400 font-medium px-4">Cargando estado de la sesión...</p>
+                    </div>
+                  ) : qrCode ? (
                     <img src={qrCode} alt="QR Code" className="w-full h-full object-contain" />
                   ) : (
                     <>
-                      <Smartphone className="h-12 w-12 text-slate-300 mb-4" />
-                      <p className="text-xs text-slate-400 font-medium px-4">Iniciando sesión en WhatsApp Web...</p>
+                      <Smartphone className="h-12 w-12 text-slate-300 mb-4 animate-pulse" />
+                      <p className="text-xs text-slate-400 font-medium px-4 font-semibold text-slate-500">
+                        {status === 'connecting' ? 'Conectando con WhatsApp...' : 'Iniciando sesión en WhatsApp Web...'}
+                      </p>
                     </>
                   )}
                 </div>
