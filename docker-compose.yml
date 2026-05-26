@@ -3,7 +3,7 @@ version: '3.8'
 services:
   db:
     image: postgres:15-alpine
-    container_name: frigo-db
+    container_name: erperia-db
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-frigodb}
@@ -19,14 +19,14 @@ services:
 
   redis:
     image: redis:alpine
-    container_name: frigo-redis
+    container_name: erperia-redis
     restart: always
     volumes:
       - redisdata:/data
 
   backend:
-    image: ghcr.io/pel-matiasvaldivia/frigo-backend:latest
-    container_name: frigo-backend
+    image: ghcr.io/pel-matiasvaldivia/erperia-backend:latest
+    container_name: erperia-backend
     restart: always
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     volumes:
@@ -49,8 +49,8 @@ services:
         condition: service_started
 
   worker:
-    image: ghcr.io/pel-matiasvaldivia/frigo-backend:latest
-    container_name: frigo-worker
+    image: ghcr.io/pel-matiasvaldivia/erperia-backend:latest
+    container_name: erperia-worker
     restart: always
     command: celery -A app.core.celery_app worker --loglevel=info --concurrency=2
     volumes:
@@ -70,8 +70,8 @@ services:
         condition: service_started
 
   frontend:
-    image: ghcr.io/pel-matiasvaldivia/frigo-frontend:latest
-    container_name: frigo-frontend
+    image: ghcr.io/pel-matiasvaldivia/erperia-frontend:latest
+    container_name: erperia-frontend
     restart: always
     ports:
       - "8870:80"
@@ -79,8 +79,8 @@ services:
       - backend
 
   nginx:
-    image: ghcr.io/pel-matiasvaldivia/frigo-nginx:latest
-    container_name: frigo-nginx
+    image: ghcr.io/pel-matiasvaldivia/erperia-nginx:latest
+    container_name: erperia-nginx
     restart: always
     ports:
       - "8890:80"
@@ -91,9 +91,8 @@ services:
       - backend
 
   whatsapp-bot:
-    build: ./whatsapp
-    image: ghcr.io/pel-matiasvaldivia/frigo-whatsapp:latest
-    container_name: frigo-whatsapp
+    image: ghcr.io/pel-matiasvaldivia/erperia-whatsapp:latest
+    container_name: erperia-whatsapp
     restart: always
     volumes:
       - ./whatsapp/auth_info_baileys:/app/auth_info_baileys

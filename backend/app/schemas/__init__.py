@@ -12,6 +12,8 @@ from app.schemas.preparacion import OrdenPreparacionUpdate, OrdenPreparacionResp
 from app.schemas.comprobante import ComprobanteCreate, ComprobanteResponse, RepartidorEntregaRequest
 from app.schemas.cuenta_corriente import CuentaCorrienteResponse, MovimientoCCResponse, RegistrarPagoRequest
 from app.schemas.configuracion import ConfiguracionSistemaUpdate, ConfiguracionSistemaResponse
+from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantStatsResponse
+from app.schemas.caja import CajaDiariaCreate, CajaDiariaClose, CajaDiariaResponse, MovimientoCajaCreate, MovimientoCajaResponse
 
 # This simplifies imports
 __all__ = [
@@ -54,5 +56,14 @@ __all__ = [
     "MovimientoCCResponse",
     "RegistrarPagoRequest",
     "ConfiguracionSistemaUpdate",
-    "ConfiguracionSistemaResponse"
+    "ConfiguracionSistemaResponse",
+    "TenantCreate",
+    "TenantUpdate",
+    "TenantResponse",
+    "TenantStatsResponse",
+    "CajaDiariaCreate",
+    "CajaDiariaClose",
+    "CajaDiariaResponse",
+    "MovimientoCajaCreate",
+    "MovimientoCajaResponse"
 ]

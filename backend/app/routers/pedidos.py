@@ -6,6 +6,8 @@ import datetime
 
 from app.core.database import get_db
 from app.core.security import get_current_user, RoleChecker
+from app.core.tenant import get_current_tenant
+from app.models.tenant import Tenant
 from app.models.pedido import Pedido, PedidoItem
 from app.models.cliente import Cliente
 from app.models.listas_precios import ListaPreciosDetalle
@@ -26,18 +28,19 @@ def list_pedidos(
     fecha_inicio: Optional[str] = None,
     fecha_fin: Optional[str] = None,
     db: Session = Depends(get_db), 
-    current_user: Usuario = Depends(admin_staff_sales)
+    current_user: Usuario = Depends(admin_staff_sales),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Get list of sales orders with filtering capabilities.
     If role is CLIENTE, they can only view their own orders.
     """
-    query = db.query(Pedido)
+    query = db.query(Pedido).filter(Pedido.tenant_id == tenant.id)
     
     # Role isolation
     if current_user.rol == "CLIENTE":
         # Find matching cliente record
-        cliente = db.query(Cliente).filter(Cliente.usuario_id == current_user.id).first()
+        cliente = db.query(Cliente).filter(Cliente.usuario_id == current_user.id, Cliente.tenant_id == tenant.id).first()
         if not cliente:
             return []
         query = query.filter(Pedido.cliente_id == cliente.id)
@@ -67,17 +70,18 @@ def list_pedidos(
 def get_pedido(
     pedido_id: int, 
     db: Session = Depends(get_db), 
-    current_user: Usuario = Depends(admin_staff_sales)
+    current_user: Usuario = Depends(admin_staff_sales),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Fetch a single sales order. Filters by client ID if client role.
     """
-    pedido = db.query(Pedido).filter(Pedido.id == pedido_id).first()
+    pedido = db.query(Pedido).filter(Pedido.id == pedido_id, Pedido.tenant_id == tenant.id).first()
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
         
     if current_user.rol == "CLIENTE":
-        cliente = db.query(Cliente).filter(Cliente.usuario_id == current_user.id).first()
+        cliente = db.query(Cliente).filter(Cliente.usuario_id == current_user.id, Cliente.tenant_id == tenant.id).first()
         if not cliente or pedido.cliente_id != cliente.id:
             raise HTTPException(status_code=403, detail="No autorizado para ver este pedido")
             
@@ -87,15 +91,16 @@ def get_pedido(
 def create_pedido(
     pedido_in: PedidoCreate, 
     db: Session = Depends(get_db), 
-    current_user: Usuario = Depends(write_access)
+    current_user: Usuario = Depends(write_access),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Create a new sales order (Nota de Pedido). 
     Fetches price list of client, sets prices, performs credit check.
     Generates preparation order in background.
     """
-    # 1. Verify Client
-    cliente = db.query(Cliente).filter(Cliente.id == pedido_in.cliente_id).first()
+    # 1. Verify Client belongs to tenant
+    cliente = db.query(Cliente).filter(Cliente.id == pedido_in.cliente_id, Cliente.tenant_id == tenant.id).first()
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
         
@@ -106,7 +111,7 @@ def create_pedido(
         )
         
     # 2. Check Credit Limit
-    cc = db.query(CuentaCorriente).filter(CuentaCorriente.cliente_id == cliente.id).first()
+    cc = db.query(CuentaCorriente).filter(CuentaCorriente.cliente_id == cliente.id, CuentaCorriente.tenant_id == tenant.id).first()
     saldo_actual = cc.saldo_actual if cc else 0.0
     limite_credito = cliente.limite_credito or 0.0
     
@@ -122,18 +127,13 @@ def create_pedido(
         ).first()
         
         if not det:
-            # Try to fetch default price or throw error
             raise HTTPException(
                 status_code=400,
                 detail=f"El producto con ID {item.producto_id} no tiene precio en la lista {cliente.lista_precios_id}"
             )
             
-        # Pig slaughterhouse pricing rule: price per kg.
-        # Initial estimated subtotal: price * estimated kg
-        # If estimated kg is not provided, use units * 10kg as a placeholder or units * venta
         weight_est = item.peso_estimado_kg if item.peso_estimado_kg and item.peso_estimado_kg > 0 else (item.cantidad_unidades * 10.0) # default 10kg per unit
         
-        # We record the selling price from the list
         precio_unit = det.precio_venta
         sub = round(precio_unit * weight_est, 2)
         
@@ -156,7 +156,6 @@ def create_pedido(
     if saldo_actual + estimated_total > limite_credito:
         credit_warn = True
         warning_msg = f"Límite de crédito superado. Límite: ${limite_credito:,.2f}, Saldo actual + pedido: ${(saldo_actual + estimated_total):,.2f}."
-        # Register warning in observations
         warning_tag = f"[ALERTA: Superó Límite de Crédito por ${(saldo_actual + estimated_total - limite_credito):,.2f}]"
         obs = f"{warning_tag} {obs}".strip()
 
@@ -167,7 +166,8 @@ def create_pedido(
         fecha=datetime.datetime.utcnow(),
         estado="Pendiente de preparación",
         observaciones=obs,
-        total=estimated_total
+        total=estimated_total,
+        tenant_id=tenant.id
     )
     db.add(new_pedido)
     db.commit()
@@ -185,7 +185,8 @@ def create_pedido(
         ruta_id=cliente.ruta_id,
         fecha_despacho=datetime.datetime.utcnow(),
         estado="Pendiente",
-        observaciones=new_pedido.observaciones
+        observaciones=new_pedido.observaciones,
+        tenant_id=tenant.id
     )
     db.add(prep_order)
     db.commit()
@@ -218,15 +219,13 @@ def update_pedido(
     pedido_id: int,
     pedido_in: PedidoUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(write_access)
+    current_user: Usuario = Depends(write_access),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Update order details.
-    Trigger preparation order creation if status moves to 'Pendiente de preparación'
-    and it doesn't already have one.
-    Supports updating items (syncing).
     """
-    pedido = db.query(Pedido).filter(Pedido.id == pedido_id).first()
+    pedido = db.query(Pedido).filter(Pedido.id == pedido_id, Pedido.tenant_id == tenant.id).first()
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
@@ -234,18 +233,26 @@ def update_pedido(
     
     # 1. Update basic fields
     update_data = pedido_in.model_dump(exclude_unset=True)
+    
+    if "cliente_id" in update_data:
+        new_client_id = update_data.pop("cliente_id")
+        if new_client_id:
+            cliente = db.query(Cliente).filter(Cliente.id == new_client_id, Cliente.tenant_id == tenant.id).first()
+            if not cliente:
+                raise HTTPException(status_code=400, detail="Cliente no encontrado")
+            pedido.cliente_id = new_client_id
+            db.flush()
+            db.refresh(pedido)
+
     if "items" in update_data:
         items_in = update_data.pop("items")
         # Sync items
-        # Delete old items
         db.query(PedidoItem).filter(PedidoItem.pedido_id == pedido.id).delete()
         
-        # Add new items
         new_total = 0.0
         cliente = pedido.cliente
         
         for item_in in items_in:
-            # Lookup price
             det = db.query(ListaPreciosDetalle).filter(
                 ListaPreciosDetalle.lista_precios_id == cliente.lista_precios_id,
                 ListaPreciosDetalle.producto_id == item_in["producto_id"]
@@ -281,7 +288,6 @@ def update_pedido(
     # 2. Logic to trigger preparation if validated
     if pedido.estado == "Pendiente de preparación" and old_status != "Pendiente de preparación":
         if not pedido.orden_preparacion:
-            # Refresh to ensure items are loaded if updated
             db.flush()
             db.refresh(pedido)
             
@@ -290,12 +296,12 @@ def update_pedido(
                 ruta_id=pedido.cliente.ruta_id if pedido.cliente else None,
                 fecha_despacho=datetime.datetime.utcnow(),
                 estado="Pendiente",
-                observaciones=pedido.observaciones
+                observaciones=pedido.observaciones,
+                tenant_id=tenant.id
             )
             db.add(prep_order)
             db.flush()
             
-            # Create bultos from items
             for item in pedido.items:
                 bulto = OrdenPreparacionBulto(
                     orden_id=prep_order.id,
@@ -315,12 +321,13 @@ def update_pedido(
 def delete_pedido(
     pedido_id: int,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(write_access)
+    current_user: Usuario = Depends(write_access),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Delete a sales order and its associated records.
     """
-    pedido = db.query(Pedido).filter(Pedido.id == pedido_id).first()
+    pedido = db.query(Pedido).filter(Pedido.id == pedido_id, Pedido.tenant_id == tenant.id).first()
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     

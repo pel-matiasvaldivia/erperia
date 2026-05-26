@@ -7,6 +7,7 @@ class Pedido(Base):
     __tablename__ = "pedidos"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
     administrativo_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
     fecha = Column(DateTime, default=func.now(), index=True)
@@ -16,6 +17,7 @@ class Pedido(Base):
     total = Column(Float, default=0.0)
 
     # Relationships
+    tenant = relationship("Tenant", back_populates="pedidos")
     cliente = relationship("Cliente", back_populates="pedidos")
     administrativo = relationship("Usuario")
     items = relationship("PedidoItem", back_populates="pedido", cascade="all, delete-orphan")

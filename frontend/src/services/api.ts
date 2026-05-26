@@ -43,6 +43,10 @@ export const authAPI = {
     const response = await api.post('/auth/register', userData);
     return response.data;
   },
+  signupTenant: async (data: Record<string, unknown>) => {
+    const response = await api.post('/auth/signup-tenant', data);
+    return response.data;
+  },
 };
 
 export const clientesAPI = {
@@ -138,4 +142,41 @@ export const configuracionAPI = {
   list: async () => (await api.get('/configuracion/')).data,
   update: async (clave: string, valor: string) => (await api.put(`/configuracion/${clave}`, { valor })).data,
   getEmpresa: async () => (await api.get('/configuracion/empresa')).data,
+  purgeSelf: async () => (await api.delete('/configuracion/tenant/purge-self')).data,
 };
+
+export const platformAdminAPI = {
+  listTenants: async () => (await api.get('/platform/tenants')).data,
+  getTenant: async (id: number) => (await api.get(`/platform/tenants/${id}`)).data,
+  createTenant: async (data: Record<string, unknown>) => (await api.post('/platform/tenants', data)).data,
+  updateTenant: async (id: number, data: Record<string, unknown>) => (await api.put(`/platform/tenants/${id}`, data)).data,
+  deleteTenant: async (id: number) => (await api.delete(`/platform/tenants/${id}`)).data,
+  uploadLogo: async (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return (await api.post(`/platform/tenants/${id}/logo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })).data;
+  },
+  getStats: async (id: number) => (await api.get(`/platform/tenants/${id}/stats`)).data,
+  listUsers: async (id: number) => (await api.get(`/platform/tenants/${id}/usuarios`)).data,
+  createUser: async (id: number, data: Record<string, unknown>) => (await api.post(`/platform/tenants/${id}/usuarios`, data)).data,
+  toggleUser: async (tenantId: number, userId: number) => (await api.patch(`/platform/tenants/${tenantId}/usuarios/${userId}/toggle`)).data,
+  deleteUser: async (tenantId: number, userId: number) => (await api.delete(`/platform/tenants/${tenantId}/usuarios/${userId}`)).data,
+  impersonate: async (id: number) => (await api.post(`/platform/tenants/${id}/impersonate`)).data,
+};
+
+export const cajaAPI = {
+  getStatus: async () => (await api.get('/caja/status')).data,
+  abrirCaja: async (data: { monto_apertura: number; observaciones_apertura?: string }) => 
+    (await api.post('/caja/abrir', data)).data,
+  cerrarCaja: async (data: { monto_cierre: number; observaciones_cierre?: string }) => 
+    (await api.post('/caja/cerrar', data)).data,
+  registrarMovimiento: async (data: { tipo: string; monto: number; descripcion: string; empleado_id?: number | null; proveedor_nombre?: string | null }) => 
+    (await api.post('/caja/movimientos', data)).data,
+  getMovimientos: async () => (await api.get('/caja/movimientos')).data,
+  getHistorial: async () => (await api.get('/caja/historial')).data,
+  getEmpleados: async () => (await api.get('/caja/empleados')).data,
+  getDetalle: async (id: number) => (await api.get(`/caja/${id}`)).data,
+};
+

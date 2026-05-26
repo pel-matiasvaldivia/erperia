@@ -58,3 +58,16 @@ uploads/
 **.node-persist**
 **_IGNORE_**
 # end managed by open-wa
+
+# Local credentials
+repo-token.txt
+
+# Local logs and test files
+logs.zip
+logs_extracted/
+backend/test_api.py
+backend/test_pdf.py
+backend/test_rl.py
+
+# Local docker compose override
+docker-compose.override.yml

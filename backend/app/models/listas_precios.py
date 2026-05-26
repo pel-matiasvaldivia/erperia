@@ -7,12 +7,14 @@ class ListaPrecios(Base):
     __tablename__ = "listas_precios"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
     nombre = Column(String, nullable=False, index=True)
     descripcion = Column(String, nullable=True)
     activa = Column(Boolean, default=True)
     fecha_actualizacion = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
+    tenant = relationship("Tenant", back_populates="listas_precios")
     detalles = relationship("ListaPreciosDetalle", back_populates="lista_precios", cascade="all, delete-orphan")
     clientes = relationship("Cliente", back_populates="lista_precios")
 

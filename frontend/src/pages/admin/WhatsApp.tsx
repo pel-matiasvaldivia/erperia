@@ -4,9 +4,11 @@ import {
   RefreshCw, Smartphone, ShieldCheck, AlertCircle,
   ExternalLink, ArrowRight, Pencil, Trash2, Plus, ShoppingCart
 } from 'lucide-react';
-import { pedidosAPI, listasPreciosAPI, productosAPI } from '../../services/api';
+import { pedidosAPI, clientesAPI, listasPreciosAPI, productosAPI } from '../../services/api';
 // Assuming we'll add whatsappAPI to services/api.ts. For now we use the general api structure.
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { SearchableSelect } from '../../components/SearchableSelect';
 
 export const WhatsAppAdmin: React.FC = () => {
   const [status, setStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading');
@@ -19,6 +21,8 @@ export const WhatsAppAdmin: React.FC = () => {
   const [editItems, setEditItems] = useState<any[]>([]);
   const [clientPriceList, setClientPriceList] = useState<any | null>(null);
   const [allProductos, setAllProductos] = useState<any[]>([]);
+  const [clientes, setClientes] = useState<any[]>([]);
+  const [editClienteId, setEditClienteId] = useState<number | ''>('');
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Add Item to Edit states
@@ -26,33 +30,53 @@ export const WhatsAppAdmin: React.FC = () => {
   const [addUnits, setAddUnits] = useState(1);
   const [addWeight, setAddWeight] = useState(10);
 
+  const { user } = useAuth();
+  const tenantSlug = user?.tenant?.slug;
+
   useEffect(() => {
     fetchStatus();
     fetchPendingOrders();
-    loadProductos();
+    loadInitialData();
     
     // Poll status every 5 seconds
     const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [tenantSlug]);
 
-  const loadProductos = async () => {
+  const loadInitialData = async () => {
     try {
-      const res = await productosAPI.list();
-      setAllProductos(res || []);
+      const [prods, clients] = await Promise.all([
+        productosAPI.list(),
+        clientesAPI.list()
+      ]);
+      setAllProductos(prods || []);
+      setClientes(clients || []);
     } catch (err) {
-      console.error(err);
+      console.error("Error loading initial data in WhatsApp:", err);
     }
   };
 
   const fetchStatus = async () => {
+    if (!tenantSlug) return;
     try {
-      const res = await api.get('/whatsapp/status');
+      const res = await api.get(`/whatsapp/status/${tenantSlug}`);
       setStatus(res.data.status);
       setQrCode(res.data.qr);
     } catch (err) {
       console.error("Error fetching WhatsApp status:", err);
       setStatus('disconnected');
+    }
+  };
+
+  const handleLogoutSession = async () => {
+    if (!tenantSlug) return;
+    if (!confirm("¿Está seguro de cerrar la sesión de WhatsApp? Su bot dejará de recibir pedidos hasta que vuelva a escanear el QR.")) return;
+    try {
+      await api.post(`/whatsapp/logout/${tenantSlug}`);
+      fetchStatus();
+    } catch (err) {
+      console.error("Error disconnecting WhatsApp session:", err);
+      alert("No se pudo desconectar la sesión de WhatsApp.");
     }
   };
 
@@ -93,6 +117,7 @@ export const WhatsAppAdmin: React.FC = () => {
   const handleEditClick = async (pedido: any) => {
     setEditingPedido(pedido);
     setEditItems(pedido.items || []);
+    setEditClienteId(pedido.cliente_id || '');
     
     // Load client price list
     if (pedido.cliente?.lista_precios_id) {
@@ -102,6 +127,43 @@ export const WhatsAppAdmin: React.FC = () => {
        } catch (err) {
          console.error(err);
        }
+    } else {
+       setClientPriceList(null);
+    }
+  };
+
+  const handleClientChange = async (clientId: number | '') => {
+    setEditClienteId(clientId);
+    if (clientId === '') {
+      setClientPriceList(null);
+      return;
+    }
+    const client = clientes.find(c => c.id === clientId);
+    if (client && client.lista_precios_id) {
+      try {
+        const listDetails = await listasPreciosAPI.getDetalles(client.lista_precios_id);
+        setClientPriceList(listDetails);
+        
+        // Update items prices or remove if not in price list
+        const updatedItems = editItems.map(item => {
+          const detail = listDetails.detalles.find((d: any) => d.producto_id === item.producto_id);
+          if (detail) {
+            return {
+              ...item,
+              precio_unitario: detail.precio_venta
+            };
+          }
+          return null;
+        }).filter(Boolean);
+        setEditItems(updatedItems);
+      } catch (err) {
+        console.error(err);
+        alert("Error al cargar la lista de precios del nuevo cliente");
+        setClientPriceList(null);
+      }
+    } else {
+      setClientPriceList(null);
+      setEditItems([]);
     }
   };
 
@@ -133,6 +195,7 @@ export const WhatsAppAdmin: React.FC = () => {
     setSavingEdit(true);
     try {
       await api.put(`/pedidos/${editingPedido.id}`, {
+        cliente_id: editClienteId || undefined,
         items: editItems.map(it => ({
           producto_id: it.producto_id,
           cantidad_unidades: it.cantidad_unidades,
@@ -208,7 +271,10 @@ export const WhatsAppAdmin: React.FC = () => {
                   <p className="text-slate-900 font-bold uppercase tracking-tight">Sesión Vinculada</p>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Bot operando normalmente</p>
                 </div>
-                <button className="text-[10px] font-bold text-red-500 uppercase tracking-widest border border-red-100 px-4 py-2 rounded-xl hover:bg-red-50 transition-all">
+                <button 
+                  onClick={handleLogoutSession}
+                  className="text-[10px] font-bold text-red-500 uppercase tracking-widest border border-red-100 px-4 py-2 rounded-xl hover:bg-red-50 transition-all"
+                >
                   Cerrar Sesión
                 </button>
               </div>
@@ -342,30 +408,63 @@ export const WhatsAppAdmin: React.FC = () => {
                   "{editingPedido.observaciones?.replace('WhatsApp: ', '')}"
                </div>
 
+               {/* Client Selection */}
+               <div className="space-y-2">
+                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                   Cliente Asignado *
+                 </label>
+                 <SearchableSelect
+                   options={clientes}
+                   value={editClienteId}
+                   onChange={(id) => handleClientChange(id)}
+                   placeholder="Buscar cliente por razón social o CUIT..."
+                   searchFields={['razon_social', 'cuit', 'codigo']}
+                   getOptionLabel={(c) => c.razon_social}
+                   getOptionSublabel={(c) => `CUIT: ${c.cuit || '—'}  |  Lista: ${c.lista_precios?.nombre || 'General'}`}
+                 />
+               </div>
+
                {/* Add product Inline */}
-               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white border border-slate-200 p-4 rounded-3xl shadow-sm">
-                  <div className="md:col-span-2">
-                     <select 
-                        value={addProductId} 
-                        onChange={(e) => setAddProductId(Number(e.target.value))}
-                        className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
-                     >
-                        <option value="">Añadir producto...</option>
-                        {clientPriceList?.detalles.map((d: any) => (
-                           <option key={d.producto_id} value={d.producto_id}>{d.producto.descripcion} (${d.precio_venta})</option>
-                        ))}
-                     </select>
-                  </div>
-                  <input 
-                    type="number" value={addUnits} onChange={(e) => setAddUnits(Number(e.target.value))}
-                    className="p-2 border border-slate-200 rounded-xl text-xs font-bold text-center" placeholder="Cant"
+               <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm space-y-4">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                    <Plus className="h-3 w-3 mr-2 text-brand-600" /> Añadir producto
+                  </h4>
+                  <SearchableSelect
+                    options={(clientPriceList?.detalles || []).map((d: any) => ({
+                      id: d.producto_id,
+                      ...d.producto,
+                      precio_venta: d.precio_venta,
+                    }))}
+                    value={addProductId}
+                    onChange={(id) => setAddProductId(id)}
+                    placeholder="Buscar por código o descripción..."
+                    searchFields={['codigo', 'descripcion']}
+                    getOptionLabel={(p) => p.descripcion}
+                    getOptionSublabel={(p) => `Cód: ${p.codigo}  |  $${p.precio_venta}/kg`}
+                    disabled={!clientPriceList}
                   />
-                  <button 
-                    onClick={handleAddItemToEdit}
-                    className="flex items-center justify-center bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-black transition-all"
-                  >
-                    <Plus className="h-4 w-4 mr-1" /> Añadir
-                  </button>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-widest">Cant.</label>
+                      <input 
+                        type="number" value={addUnits} min="1" onChange={(e) => setAddUnits(Number(e.target.value))}
+                        className="w-full p-2 border border-slate-200 rounded-xl text-xs font-bold text-center bg-slate-50 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-widest">Kg Est.</label>
+                      <input 
+                        type="number" value={addWeight} min="0.1" step="0.5" onChange={(e) => setAddWeight(Number(e.target.value))}
+                        className="w-full p-2 border border-slate-200 rounded-xl text-xs font-bold text-center bg-slate-50 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                    </div>
+                    <button 
+                      onClick={handleAddItemToEdit}
+                      className="flex items-center justify-center bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-black transition-all mt-5"
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Añadir
+                    </button>
+                  </div>
                </div>
 
                {/* Items List */}

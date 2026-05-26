@@ -7,6 +7,7 @@ class OrdenPreparacion(Base):
     __tablename__ = "ordenes_preparacion"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
     pedido_id = Column(Integer, ForeignKey("pedidos.id", ondelete="CASCADE"), unique=True, nullable=False)
     ruta_id = Column(Integer, ForeignKey("rutas.id"), nullable=True)
     fecha_despacho = Column(DateTime, default=func.now(), index=True)
@@ -14,6 +15,7 @@ class OrdenPreparacion(Base):
     observaciones = Column(String, nullable=True)
 
     # Relationships
+    tenant = relationship("Tenant", back_populates="ordenes_preparacion")
     pedido = relationship("Pedido", back_populates="orden_preparacion")
     ruta = relationship("Ruta", back_populates="ordenes_preparacion")
     bultos = relationship("OrdenPreparacionBulto", back_populates="orden", cascade="all, delete-orphan")

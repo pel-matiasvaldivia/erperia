@@ -6,6 +6,8 @@ import os
 
 from app.core.database import get_db
 from app.core.security import get_current_user, RoleChecker
+from app.core.tenant import get_current_tenant
+from app.models.tenant import Tenant
 from app.models.listas_precios import ListaPrecios, ListaPreciosDetalle
 from app.models.producto import Producto
 from app.models.usuario import Usuario
@@ -26,23 +28,25 @@ read_access = RoleChecker(["SUPERADMIN", "ADMINISTRATIVO", "VENDEDOR"])
 @router.get("/", response_model=List[ListaPreciosResponse])
 def list_listas_precios(
     db: Session = Depends(get_db), 
-    current_user: Usuario = Depends(read_access)
+    current_user: Usuario = Depends(read_access),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Get all active price lists. Accessible to admin and staff.
     """
-    return db.query(ListaPrecios).all()
+    return db.query(ListaPrecios).filter(ListaPrecios.tenant_id == tenant.id).all()
 
 @router.get("/{lista_id}/detalles", response_model=ListaPreciosConDetalles)
 def get_lista_detalles(
     lista_id: int, 
     db: Session = Depends(get_db), 
-    current_user: Usuario = Depends(read_access)
+    current_user: Usuario = Depends(read_access),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Retrieve all product prices, stock, and details inside a specific pricing list.
     """
-    lista = db.query(ListaPrecios).filter(ListaPrecios.id == lista_id).first()
+    lista = db.query(ListaPrecios).filter(ListaPrecios.id == lista_id, ListaPrecios.tenant_id == tenant.id).first()
     if not lista:
         raise HTTPException(status_code=404, detail="Lista de precios no encontrada")
     return lista
@@ -51,27 +55,29 @@ def get_lista_detalles(
 def create_lista_precios(
     lista_in: ListaPreciosCreate, 
     db: Session = Depends(get_db), 
-    current_user: Usuario = Depends(superadmin_only)
+    current_user: Usuario = Depends(superadmin_only),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Create a new pricing list (Superadmin only).
     """
     # Check if name is taken
-    existing = db.query(ListaPrecios).filter(ListaPrecios.nombre == lista_in.nombre).first()
+    existing = db.query(ListaPrecios).filter(ListaPrecios.nombre == lista_in.nombre, ListaPrecios.tenant_id == tenant.id).first()
     if existing:
         raise HTTPException(status_code=400, detail="Ya existe una lista con este nombre")
         
     new_lista = ListaPrecios(
         nombre=lista_in.nombre,
         descripcion=lista_in.descripcion,
-        activa=lista_in.activa
+        activa=lista_in.activa,
+        tenant_id=tenant.id
     )
     db.add(new_lista)
     db.commit()
     db.refresh(new_lista)
     
-    # Auto-populate details for all existing products with $0.00
-    all_products = db.query(Producto).all()
+    # Auto-populate details for all existing products of the tenant with $0.00
+    all_products = db.query(Producto).filter(Producto.tenant_id == tenant.id).all()
     for prod in all_products:
         det = ListaPreciosDetalle(
             lista_precios_id=new_lista.id,
@@ -92,12 +98,13 @@ def update_lista_precios(
     lista_id: int, 
     lista_in: ListaPreciosUpdate, 
     db: Session = Depends(get_db), 
-    current_user: Usuario = Depends(superadmin_only)
+    current_user: Usuario = Depends(superadmin_only),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Modify details of a price list (Superadmin only).
     """
-    lista = db.query(ListaPrecios).filter(ListaPrecios.id == lista_id).first()
+    lista = db.query(ListaPrecios).filter(ListaPrecios.id == lista_id, ListaPrecios.tenant_id == tenant.id).first()
     if not lista:
         raise HTTPException(status_code=404, detail="Lista de precios no encontrada")
         
@@ -112,12 +119,13 @@ def update_lista_precios(
 def delete_lista_precios(
     lista_id: int, 
     db: Session = Depends(get_db), 
-    current_user: Usuario = Depends(superadmin_only)
+    current_user: Usuario = Depends(superadmin_only),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Remove a pricing list (Superadmin only).
     """
-    lista = db.query(ListaPrecios).filter(ListaPrecios.id == lista_id).first()
+    lista = db.query(ListaPrecios).filter(ListaPrecios.id == lista_id, ListaPrecios.tenant_id == tenant.id).first()
     if not lista:
         raise HTTPException(status_code=404, detail="Lista de precios no encontrada")
     db.delete(lista)
@@ -130,11 +138,16 @@ def update_detalle_precio(
     detalle_id: int,
     detalle_in: ListaPreciosDetalleUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(superadmin_only)
+    current_user: Usuario = Depends(superadmin_only),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Edit cost, prices, or stock for a single item in a list (Superadmin only).
     """
+    lista = db.query(ListaPrecios).filter(ListaPrecios.id == lista_id, ListaPrecios.tenant_id == tenant.id).first()
+    if not lista:
+        raise HTTPException(status_code=404, detail="Lista de precios no encontrada")
+
     det = db.query(ListaPreciosDetalle).filter(
         ListaPreciosDetalle.id == detalle_id,
         ListaPreciosDetalle.lista_precios_id == lista_id
@@ -155,13 +168,14 @@ async def importar_lista_excel(
     lista_id: int = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(superadmin_only)
+    current_user: Usuario = Depends(superadmin_only),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Upload an Excel file to bulk import or update prices and stocks (Superadmin only).
     """
-    # Verify list exists
-    lista = db.query(ListaPrecios).filter(ListaPrecios.id == lista_id).first()
+    # Verify list exists and belongs to tenant
+    lista = db.query(ListaPrecios).filter(ListaPrecios.id == lista_id, ListaPrecios.tenant_id == tenant.id).first()
     if not lista:
         raise HTTPException(status_code=404, detail="Lista de precios destino no existe")
         
@@ -186,12 +200,18 @@ async def importar_lista_excel(
 def exportar_lista_excel(
     lista_id: int,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(read_access)
+    current_user: Usuario = Depends(read_access),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Export current prices of a list to an Excel spreadsheet.
     Returns download link.
     """
+    # Verify list exists and belongs to tenant
+    lista = db.query(ListaPrecios).filter(ListaPrecios.id == lista_id, ListaPrecios.tenant_id == tenant.id).first()
+    if not lista:
+        raise HTTPException(status_code=404, detail="Lista de precios no encontrada")
+        
     try:
         download_url = export_prices_to_excel(db, lista_id, settings.UPLOAD_DIR)
         return {"download_url": download_url}
@@ -202,20 +222,21 @@ def exportar_lista_excel(
 def actualizar_masivo_precios(
     params: BulkPriceUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(superadmin_only)
+    current_user: Usuario = Depends(superadmin_only),
+    tenant: Tenant = Depends(get_current_tenant)
 ):
     """
     Bulk price updates by percentage or fixed amount (Superadmin only).
     Optionally filters by product department/family.
     """
-    lista = db.query(ListaPrecios).filter(ListaPrecios.id == params.lista_id).first()
+    lista = db.query(ListaPrecios).filter(ListaPrecios.id == params.lista_id, ListaPrecios.tenant_id == tenant.id).first()
     if not lista:
         raise HTTPException(status_code=404, detail="Lista de precios no encontrada")
         
     query = db.query(ListaPreciosDetalle).filter(ListaPreciosDetalle.lista_precios_id == params.lista_id)
     
     if params.departamento:
-        query = query.join(Producto).filter(Producto.departamento == params.departamento)
+        query = query.join(Producto).filter(Producto.departamento == params.departamento, Producto.tenant_id == tenant.id)
         
     detalles = query.all()
     count = 0

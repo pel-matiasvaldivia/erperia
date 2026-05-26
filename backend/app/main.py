@@ -8,11 +8,17 @@ from app.core.database import engine, Base
 from app.db.seed import seed_db
 
 # Import routers
-from app.routers import auth, clientes, productos, listas_precios, pedidos, despacho, comprobantes, cuentas_corrientes, configuracion, preparacion, rutas, dashboard, whatsapp
+from app.routers import (
+    auth, clientes, productos, listas_precios, pedidos, 
+    despacho, comprobantes, cuentas_corrientes, configuracion, 
+    preparacion, rutas, dashboard, whatsapp, platform_admin, geo, caja, onboarding
+)
 
 # 1. Initialize DB and Seed Data
 try:
     print("Iniciando y migrando base de datos...")
+    from app.db.migrate import run_migrations
+    run_migrations()
     Base.metadata.create_all(bind=engine)
     seed_db()
 except Exception as e:
@@ -55,6 +61,10 @@ app.include_router(rutas.router, prefix=settings.API_V1_STR)
 app.include_router(dashboard.router, prefix=settings.API_V1_STR)
 app.include_router(configuracion.router, prefix=settings.API_V1_STR)
 app.include_router(whatsapp.router, prefix=settings.API_V1_STR)
+app.include_router(platform_admin.router, prefix=settings.API_V1_STR)
+app.include_router(geo.router, prefix=settings.API_V1_STR)
+app.include_router(caja.router, prefix=settings.API_V1_STR)
+app.include_router(onboarding.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():
@@ -63,3 +73,7 @@ def root():
         "docs": "/docs",
         "version": "1.0.0"
     }
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

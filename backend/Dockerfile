@@ -38,7 +38,7 @@ COPY app ./app
 
 # Copy and configure entrypoint (runs DB migrations on startup)
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Create uploads directory and ensure correct permissions
 RUN mkdir -p /app/uploads && chown -R appuser:appgroup /app/uploads && chmod -R 777 /app/uploads

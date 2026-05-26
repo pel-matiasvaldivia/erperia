@@ -54,7 +54,8 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
 
 class RoleChecker:
     def __init__(self, allowed_roles: List[str]):
-        self.allowed_roles = allowed_roles
+        # Translate SUPERADMIN to TENANT_ADMIN for backward compatibility
+        self.allowed_roles = [r if r != "SUPERADMIN" else "TENANT_ADMIN" for r in allowed_roles]
 
     def __call__(self, current_user: Usuario = Depends(get_current_user)) -> Usuario:
         if current_user.rol not in self.allowed_roles:

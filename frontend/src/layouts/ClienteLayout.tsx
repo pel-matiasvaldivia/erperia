@@ -1,7 +1,8 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShoppingBag, Landmark, LogOut, PhoneCall, Beef } from 'lucide-react';
+import { ShoppingBag, Landmark, LogOut, PhoneCall, Package } from 'lucide-react';
+import { ForcedPasswordChangeOverlay } from '../components/ForcedPasswordChangeOverlay';
 
 export const ClienteLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
@@ -12,17 +13,26 @@ export const ClienteLayout: React.FC<{ children: React.ReactNode }> = ({ childre
     navigate('/login');
   };
 
+  const currentTenantName = user?.tenant?.nombre_fantasia || user?.tenant?.nombre || "ERPERIA";
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans">
+      {user?.debe_cambiar_password && <ForcedPasswordChangeOverlay />}
       {/* Mobile Top Header */}
       <header className="sticky top-0 z-30 flex items-center justify-between h-14 px-4 bg-slate-900/90 backdrop-blur border-b border-slate-800">
         <div className="flex items-center space-x-2">
-          <div className="p-1.5 bg-rose-600 rounded text-white">
-            <Beef className="h-5 w-5" />
-          </div>
+          {user?.tenant?.logo_url ? (
+            <img src={user.tenant.logo_url} alt={currentTenantName} className="h-8 w-auto max-w-[32px] object-contain rounded" />
+          ) : (
+            <div className="p-1.5 bg-violet-600 rounded text-white shadow-sm flex-shrink-0">
+              <Package className="h-5 w-5" />
+            </div>
+          )}
           <div>
-            <span className="text-sm font-extrabold tracking-tight text-white">J&E CLIENTES</span>
-            <p className="text-[8px] text-rose-500 font-bold uppercase tracking-wider">Portal Autoservicio</p>
+            <span className="text-sm font-extrabold tracking-tight text-white uppercase truncate block max-w-[150px]">
+              {currentTenantName}
+            </span>
+            <p className="text-[8px] text-violet-400 font-bold uppercase tracking-wider">Portal Clientes</p>
           </div>
         </div>
 
@@ -30,7 +40,7 @@ export const ClienteLayout: React.FC<{ children: React.ReactNode }> = ({ childre
           <span className="text-xs text-slate-400 font-semibold">{user?.nombre.split(' ')[0]}</span>
           <button 
             onClick={handleLogout}
-            className="p-1.5 bg-slate-800 text-rose-400 hover:bg-rose-950/20 rounded-lg transition-colors"
+            className="p-1.5 bg-slate-800 text-violet-400 hover:bg-violet-950/20 rounded-lg transition-colors"
             title="Cerrar sesión"
           >
             <LogOut className="h-4 w-4" />
@@ -51,7 +61,7 @@ export const ClienteLayout: React.FC<{ children: React.ReactNode }> = ({ childre
           to="/mis-pedidos"
           className={({ isActive }) => 
             `flex flex-col items-center justify-center w-20 h-12 rounded-xl transition-all duration-200 ${
-              isActive ? 'text-rose-500 font-bold' : 'text-slate-400 hover:text-slate-200'
+              isActive ? 'text-violet-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`
           }
         >
@@ -63,7 +73,7 @@ export const ClienteLayout: React.FC<{ children: React.ReactNode }> = ({ childre
           to="/cc"
           className={({ isActive }) => 
             `flex flex-col items-center justify-center w-20 h-12 rounded-xl transition-all duration-200 ${
-              isActive ? 'text-rose-500 font-bold' : 'text-slate-400 hover:text-slate-200'
+              isActive ? 'text-violet-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`
           }
         >

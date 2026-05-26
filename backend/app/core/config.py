@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     EMPRESA_TELEFONO: str = "+5493512345678"
     EMPRESA_EMAIL: str = "contacto@frigorificoje.com.ar"
     
+    # Geolocation & Platform
+    GOOGLE_MAPS_API_KEY: str = ""
+    PLATFORM_ADMIN_EMAIL: str = "tenant-admin@erperia.com.ar"
+    PLATFORM_ADMIN_PASSWORD: str = "Tenant-admin123"
+    BOT_SECRET: str = "frigo-bot-secret"
+    
     # PDF Upload directory
     UPLOAD_DIR: str = "/app/uploads"
 

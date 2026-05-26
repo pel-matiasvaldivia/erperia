@@ -33,6 +33,7 @@ class PedidoCreate(PedidoBase):
 class PedidoUpdate(BaseModel):
     estado: Optional[str] = None # "Pendiente de preparación", "En preparación", "Listo para despacho", etc.
     observaciones: Optional[str] = None
+    cliente_id: Optional[int] = None
     items: Optional[List[PedidoItemCreate]] = None
 
 class PedidoResponse(PedidoBase):

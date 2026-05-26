@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { pedidosAPI, clientesAPI, listasPreciosAPI, productosAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { SearchableSelect } from '../../components/SearchableSelect';
 import { 
   Plus, 
   Search, 
@@ -12,7 +13,8 @@ import {
   User, 
   FileCheck,
   ShoppingCart,
-  X
+  X,
+  Pencil
 } from 'lucide-react';
 
 interface PedidoItemInput {
@@ -55,6 +57,16 @@ export const Pedidos: React.FC = () => {
   // View Order Modal
   const [viewOrderModal, setViewOrderModal] = useState<any | null>(null);
 
+  // Edit Order Drawer
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  const [editingPedido, setEditingPedido] = useState<any | null>(null);
+  const [editItems, setEditItems] = useState<any[]>([]);
+  const [editClientPriceList, setEditClientPriceList] = useState<any | null>(null);
+  const [editAddProductId, setEditAddProductId] = useState<number | ''>('');
+  const [editAddUnits, setEditAddUnits] = useState<number>(1);
+  const [editAddWeight, setEditAddWeight] = useState<number>(10);
+  const [savingEdit, setSavingEdit] = useState(false);
+
   useEffect(() => {
     fetchInitialData();
   }, [filterEstado, filterCliente]);
@@ -81,9 +93,13 @@ export const Pedidos: React.FC = () => {
   };
 
   // Triggered when client changes in order creation
-  const handleClientChange = async (clientId: number) => {
+  const handleClientChange = async (clientId: number | '') => {
     setSelectedClienteId(clientId);
     setItems([]);
+    if (clientId === '') {
+      setClientPriceList(null);
+      return;
+    }
     const client = clientes.find(c => c.id === clientId);
     if (client && client.lista_precios_id) {
       try {
@@ -198,6 +214,77 @@ export const Pedidos: React.FC = () => {
     setAddWeight(10);
   };
 
+  const handleEditClick = async (pedido: any) => {
+    setEditingPedido(pedido);
+    setEditItems(pedido.items?.map((it: any) => ({
+      producto_id: it.producto_id,
+      cantidad_unidades: it.cantidad_unidades,
+      peso_estimado_kg: it.peso_estimado_kg,
+      precio_unitario: it.precio_unitario,
+      producto: it.producto,
+    })) || []);
+    setEditAddProductId('');
+    setEditAddUnits(1);
+    setEditAddWeight(10);
+    setEditClientPriceList(null);
+    if (pedido.cliente?.lista_precios_id) {
+      try {
+        const listDetails = await listasPreciosAPI.getDetalles(pedido.cliente.lista_precios_id);
+        setEditClientPriceList(listDetails);
+      } catch (err) {
+        console.error('Error cargando lista de precios para edición:', err);
+      }
+    }
+    setEditDrawerOpen(true);
+  };
+
+  const handleAddEditItem = () => {
+    if (!editAddProductId || !editClientPriceList) return;
+    const priceDetail = editClientPriceList.detalles.find((d: any) => d.producto_id === editAddProductId);
+    if (!priceDetail) {
+      alert('El producto no está en la lista de precios del cliente');
+      return;
+    }
+    const product = productos.find(p => p.id === editAddProductId);
+    if (!product) return;
+    const exists = editItems.some(it => it.producto_id === editAddProductId);
+    if (exists) {
+      alert('El producto ya está en el pedido. Puede editar su cantidad directamente.');
+      return;
+    }
+    setEditItems([...editItems, {
+      producto_id: product.id,
+      cantidad_unidades: editAddUnits,
+      peso_estimado_kg: editAddWeight,
+      precio_unitario: priceDetail.precio_venta,
+      producto: product,
+    }]);
+    setEditAddProductId('');
+    setEditAddUnits(1);
+    setEditAddWeight(10);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPedido) return;
+    setSavingEdit(true);
+    try {
+      await pedidosAPI.update(editingPedido.id, {
+        items: editItems.map(it => ({
+          producto_id: it.producto_id,
+          cantidad_unidades: it.cantidad_unidades,
+          peso_estimado_kg: it.peso_estimado_kg,
+        }))
+      });
+      setEditDrawerOpen(false);
+      setEditingPedido(null);
+      fetchInitialData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Error al guardar cambios del pedido');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -308,13 +395,24 @@ export const Pedidos: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-4 px-4 text-center">
-                      <button
-                        onClick={() => setViewOrderModal(pedido)}
-                        className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl transition-all"
-                        title="Ver detalles"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center justify-center space-x-2">
+                        <button
+                          onClick={() => setViewOrderModal(pedido)}
+                          className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl transition-all"
+                          title="Ver detalles"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        {user?.rol !== 'CLIENTE' && (
+                          <button
+                            onClick={() => handleEditClick(pedido)}
+                            className="p-2 bg-violet-50 text-violet-500 hover:bg-violet-100 rounded-xl transition-all"
+                            title="Editar pedido"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -356,19 +454,15 @@ export const Pedidos: React.FC = () => {
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                   Cliente Solicitante *
                 </label>
-                <select
-                  required
+                <SearchableSelect
+                  options={clientes}
                   value={selectedClienteId}
-                  onChange={(e) => handleClientChange(Number(e.target.value))}
-                  className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all cursor-pointer"
-                >
-                  <option value="">Seleccione un cliente de la cartera...</option>
-                  {clientes.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.razon_social} ({c.lista_precios?.nombre || 'General'})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => handleClientChange(id)}
+                  placeholder="Buscar cliente por nombre o CUIT..."
+                  searchFields={['razon_social', 'cuit', 'codigo']}
+                  getOptionLabel={(c) => c.razon_social}
+                  getOptionSublabel={(c) => `CUIT: ${c.cuit || '—'}  |  Lista: ${c.lista_precios?.nombre || 'General'}`}
+                />
               </div>
 
               {selectedClienteId && clientPriceList && (
@@ -383,18 +477,19 @@ export const Pedidos: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="md:col-span-2">
                         <label className="block text-[10px] text-slate-400 font-bold mb-2 uppercase tracking-widest">Producto del Catálogo</label>
-                        <select
+                        <SearchableSelect
+                          options={clientPriceList.detalles.map((det: any) => ({
+                            id: det.producto_id,
+                            ...det.producto,
+                            precio_venta: det.precio_venta,
+                          }))}
                           value={addProductId}
-                          onChange={(e) => setAddProductId(Number(e.target.value))}
-                          className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all cursor-pointer"
-                        >
-                          <option value="">Seleccionar producto...</option>
-                          {clientPriceList.detalles.map((det: any) => (
-                            <option key={det.producto_id} value={det.producto_id}>
-                              {det.producto.descripcion} (${det.precio_venta}/kg)
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(id) => setAddProductId(id)}
+                          placeholder="Buscar por código o descripción..."
+                          searchFields={['codigo', 'descripcion']}
+                          getOptionLabel={(p) => p.descripcion}
+                          getOptionSublabel={(p) => `Cód: ${p.codigo}  |  $${p.precio_venta}/kg`}
+                        />
                       </div>
 
                       <div>
@@ -514,6 +609,159 @@ export const Pedidos: React.FC = () => {
                 className="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm rounded-2xl transition-all shadow-xl shadow-brand-900/20 disabled:opacity-30 disabled:shadow-none uppercase tracking-widest active:scale-[0.98]"
               >
                 Registrar Nota de Pedido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Order Drawer */}
+      {editDrawerOpen && editingPedido && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setEditDrawerOpen(false)}></div>
+          <div className="relative w-full max-w-2xl bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+            {/* Header */}
+            <div className="flex justify-between items-center p-8 border-b border-slate-100">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-violet-50 rounded-2xl text-violet-600">
+                  <Pencil className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Editar Pedido <span className="text-violet-600">#{editingPedido.id}</span></h2>
+                  <p className="text-slate-400 text-xs font-medium">Cliente: {editingPedido.cliente?.razon_social}</p>
+                </div>
+              </div>
+              <button onClick={() => setEditDrawerOpen(false)} className="p-2 text-slate-300 hover:text-slate-900 transition-colors">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 space-y-8">
+              {/* Add product section */}
+              {editClientPriceList ? (
+                <div className="p-6 bg-slate-50 border border-slate-200 rounded-[2rem] space-y-5">
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                    <Plus className="h-4 w-4 mr-2 text-violet-600" /> Agregar Producto
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] text-slate-400 font-bold mb-2 uppercase tracking-widest">Producto</label>
+                      <SearchableSelect
+                        options={editClientPriceList.detalles.map((det: any) => ({
+                          id: det.producto_id,
+                          ...det.producto,
+                          precio_venta: det.precio_venta,
+                        }))}
+                        value={editAddProductId}
+                        onChange={(id) => setEditAddProductId(id)}
+                        placeholder="Buscar por código o descripción..."
+                        searchFields={['codigo', 'descripcion']}
+                        getOptionLabel={(p) => p.descripcion}
+                        getOptionSublabel={(p) => `Cód: ${p.codigo}  |  $${p.precio_venta}/kg`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 font-bold mb-2 uppercase tracking-widest">Cant. Unidades</label>
+                      <input
+                        type="number" min="1" value={editAddUnits}
+                        onChange={(e) => setEditAddUnits(Math.max(1, Number(e.target.value)))}
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 font-bold mb-2 uppercase tracking-widest">Peso Estimado (kg)</label>
+                      <input
+                        type="number" min="0.1" step="0.5" value={editAddWeight}
+                        onChange={(e) => setEditAddWeight(Math.max(0.1, Number(e.target.value)))}
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button" onClick={handleAddEditItem}
+                    className="w-full py-3.5 bg-slate-900 hover:bg-black text-white font-bold text-xs rounded-2xl transition-all shadow-lg active:scale-[0.98] uppercase tracking-widest"
+                  >
+                    Añadir Ítem
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-700 font-medium">
+                  Este cliente no tiene lista de precios asignada. No se pueden agregar productos nuevos.
+                </div>
+              )}
+
+              {/* Items list */}
+              <div className="space-y-4">
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center px-1">
+                  <ShoppingCart className="h-4 w-4 mr-2 text-violet-600" /> Ítems del Pedido
+                </h3>
+                <div className="border border-slate-200 rounded-3xl overflow-hidden bg-white shadow-sm">
+                  {editItems.length === 0 ? (
+                    <div className="text-center text-sm text-slate-300 py-12 italic">
+                      <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-10" />
+                      No hay productos en el pedido
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {editItems.map((item, idx) => (
+                        <div key={idx} className="p-5 flex items-center justify-between group hover:bg-slate-50 transition-colors">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <span className="font-bold text-xs bg-slate-100 text-slate-500 rounded px-1.5 py-0.5">{item.producto?.codigo}</span>
+                              <span className="font-bold text-slate-900">{item.producto?.descripcion}</span>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] text-slate-400 font-bold">Unid:</span>
+                                <input
+                                  type="number" min="1" value={item.cantidad_unidades}
+                                  onChange={(e) => {
+                                    const updated = [...editItems];
+                                    updated[idx] = { ...updated[idx], cantidad_unidades: Math.max(1, Number(e.target.value)) };
+                                    setEditItems(updated);
+                                  }}
+                                  className="w-16 px-2 py-1 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg text-center focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                />
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] text-slate-400 font-bold">Kg Est:</span>
+                                <input
+                                  type="number" min="0.1" step="0.5" value={item.peso_estimado_kg}
+                                  onChange={(e) => {
+                                    const updated = [...editItems];
+                                    updated[idx] = { ...updated[idx], peso_estimado_kg: Math.max(0.1, Number(e.target.value)) };
+                                    setEditItems(updated);
+                                  }}
+                                  className="w-16 px-2 py-1 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg text-center font-mono focus:outline-none focus:ring-1 focus:ring-violet-500"
+                                />
+                              </div>
+                              <span className="text-xs text-slate-400 font-medium">${item.precio_unitario}/kg</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditItems(editItems.filter((_, i) => i !== idx))}
+                            className="text-slate-300 hover:text-rose-600 p-2 hover:bg-rose-50 rounded-xl transition-all ml-4"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-slate-100 p-8 bg-white">
+              <button
+                type="button"
+                disabled={savingEdit || editItems.length === 0}
+                onClick={handleSaveEdit}
+                className="w-full py-4 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-2xl transition-all shadow-xl shadow-violet-900/20 disabled:opacity-30 disabled:shadow-none uppercase tracking-widest active:scale-[0.98]"
+              >
+                {savingEdit ? 'Guardando...' : 'Guardar Cambios'}
               </button>
             </div>
           </div>

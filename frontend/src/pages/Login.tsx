@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Beef, KeyRound, Mail, AlertTriangle } from 'lucide-react';
+import { Package, KeyRound, Mail, AlertTriangle } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -11,6 +11,14 @@ export const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const emailParam = params.get('email');
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -18,7 +26,7 @@ export const Login: React.FC = () => {
     try {
       await login(email, password);
       // Auth context will populate the user. We navigate to home.
-      navigate('/');
+      navigate('/app');
     } catch (err: any) {
       console.error(err);
       setError(
@@ -32,21 +40,21 @@ export const Login: React.FC = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-50 px-4 py-12 relative overflow-hidden font-sans">
-      {/* Decorative Traditional Patterns */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-600 via-accent-yellow-400 to-accent-brown-900"></div>
+      {/* Decorative Brand Accent Line */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-indigo-600"></div>
       
       {/* Background ambient glowing shapes */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl -z-10 animate-pulse"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent-yellow-500/10 rounded-full blur-3xl -z-10"></div>
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl -z-10 animate-pulse"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -z-10"></div>
       
-      <div className="w-full max-w-md glass-panel p-8 rounded-3xl shadow-xl relative border-brand-100">
+      <div className="w-full max-w-md bg-white border border-slate-200/80 p-8 rounded-3xl shadow-xl relative">
         {/* Brand Header */}
         <div className="flex flex-col items-center mb-8 text-center text-slate-900">
-          <div className="p-4 bg-brand-600 text-white rounded-2xl shadow-xl shadow-brand-900/20 mb-3 group-hover:scale-105 transition-transform duration-300">
-            <Beef className="h-10 w-10" />
+          <div className="p-4 bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-violet-500/20 mb-3 group-hover:scale-105 transition-transform duration-300">
+            <Package className="h-10 w-10" />
           </div>
-          <h2 className="text-2xl font-extrabold tracking-tight font-sans text-brand-900">FRIGORÍFICO J&E</h2>
-          <p className="text-xs text-brand-600 font-bold uppercase tracking-widest mt-1">Acceso al Sistema ERP</p>
+          <h2 className="text-2xl font-black tracking-tight text-slate-900">ERP<span className="text-violet-600">ERIA</span></h2>
+          <p className="text-xs text-violet-600 font-bold uppercase tracking-widest mt-1.5">Acceso al Sistema ERP</p>
         </div>
 
         {error && (
@@ -71,8 +79,8 @@ export const Login: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="ejemplo@frigorificoje.com.ar"
-                className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all duration-200"
+                placeholder="ejemplo@erperia.com"
+                className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all duration-200"
               />
             </div>
           </div>
@@ -92,7 +100,7 @@ export const Login: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all duration-200"
+                className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all duration-200"
               />
             </div>
           </div>
@@ -101,7 +109,7 @@ export const Login: React.FC = () => {
           <button
             type="submit"
             disabled={loadingSubmit}
-            className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-brand-900/20 active:scale-[0.98] disabled:opacity-50"
+            className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold rounded-xl transition-all duration-200 shadow-md shadow-violet-500/20 active:scale-[0.98] disabled:opacity-50"
           >
             {loadingSubmit ? 'Verificando...' : 'Iniciar Sesión'}
           </button>
@@ -109,27 +117,27 @@ export const Login: React.FC = () => {
 
         {/* Demo Accounts Panel */}
         <div className="mt-8 pt-6 border-t border-slate-100 text-xs text-slate-500 text-center">
-          <p className="font-semibold text-slate-400 uppercase tracking-wider mb-2">Cuentas Demostración:</p>
-          <div className="grid grid-cols-2 gap-2 text-[10px] text-left max-w-xs mx-auto">
+          <p className="font-bold text-slate-400 uppercase tracking-wider mb-3">Cuentas de Demostración:</p>
+          <div className="grid grid-cols-2 gap-3 text-[10px] text-left max-w-xs mx-auto">
             <div>
-              <p className="font-bold text-slate-500">Superadmin:</p>
-              <p>admin@frigorificoje.com.ar</p>
-              <p className="font-mono text-brand-600">admin123</p>
+              <p className="font-bold text-slate-600">Superadmin:</p>
+              <p className="text-slate-500 font-mono truncate">admin@erperia.com.ar</p>
+              <p className="font-bold text-violet-600 font-mono">admin123</p>
             </div>
             <div>
-              <p className="font-bold text-slate-500">Administrativo:</p>
-              <p>admin_ventas@frigorificoje.com.ar</p>
-              <p className="font-mono text-brand-600">ventas123</p>
+              <p className="font-bold text-slate-600">Administrativo:</p>
+              <p className="text-slate-500 font-mono truncate">admin_ventas@erperia.com.ar</p>
+              <p className="font-bold text-violet-600 font-mono">ventas123</p>
             </div>
             <div className="mt-1">
-              <p className="font-bold text-slate-500">Vendedor:</p>
-              <p>vendedor@frigorificoje.com.ar</p>
-              <p className="font-mono text-brand-600">vendedor123</p>
+              <p className="font-bold text-slate-600">Vendedor:</p>
+              <p className="text-slate-500 font-mono truncate">vendedor@erperia.com.ar</p>
+              <p className="font-bold text-violet-600 font-mono">vendedor123</p>
             </div>
             <div className="mt-1">
-              <p className="font-bold text-slate-500">Repartidor:</p>
-              <p>reparto@frigorificoje.com.ar</p>
-              <p className="font-mono text-brand-600">reparto123</p>
+              <p className="font-bold text-slate-600">Repartidor:</p>
+              <p className="text-slate-500 font-mono truncate">reparto@erperia.com.ar</p>
+              <p className="font-bold text-violet-600 font-mono">reparto123</p>
             </div>
           </div>
         </div>

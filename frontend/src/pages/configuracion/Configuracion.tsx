@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { listasPreciosAPI, rutasAPI, authAPI, configuracionAPI } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { 
   Settings, 
   Upload, 
@@ -8,14 +9,20 @@ import {
   FileSpreadsheet, 
   UserCheck, 
   Wrench, 
-  RefreshCw 
+  RefreshCw,
+  AlertTriangle,
+  Trash2
 } from 'lucide-react';
 
 export const Configuracion: React.FC = () => {
+  const { logout } = useAuth();
   const [listas, setListas] = useState<any[]>([]);
   const [rutas, setRutas] = useState<any[]>([]);
   const [configs, setConfigs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Self-purge state
+  const [purging, setPurging] = useState(false);
 
   // Excel Upload State
   const [selectedListId, setSelectedListId] = useState<number | ''>('');
@@ -150,10 +157,36 @@ export const Configuracion: React.FC = () => {
     try {
       await configuracionAPI.update('NUM_FACTURA_SIGUIENTE', nextFC);
       await configuracionAPI.update('NUM_REMITO_SIGUIENTE', nextRM);
-      alert("¡Secuencias guardadas!");
+      alert('¡Secuencias guardadas!');
       fetchConfigData();
     } catch (err) {
-      alert("Error al actualizar secuencias");
+      alert('Error al actualizar secuencias');
+    }
+  };
+
+  const handlePurgeSelf = async () => {
+    const confirm1 = window.confirm(
+      '⚠️ ZONA DE PELIGRO\n\nEsta acción eliminará PERMANENTEMENTE tu empresa y TODOS sus datos del sistema (pedidos, clientes, productos, cuentas, comprobantes, rutas, etc.)\n\n¿Deseas continuar?'
+    );
+    if (!confirm1) return;
+
+    const confirmText = window.prompt(
+      'Para confirmar la eliminación irreversible, escribe exactamente: ELIMINAR MI EMPRESA'
+    );
+    if (confirmText?.trim() !== 'ELIMINAR MI EMPRESA') {
+      alert('Texto de confirmación incorrecto. Operación cancelada.');
+      return;
+    }
+
+    setPurging(true);
+    try {
+      await configuracionAPI.purgeSelf();
+      alert('✅ Tu empresa y todos sus datos han sido eliminados exitosamente. Serás redirigido.');
+      logout();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Error al eliminar los datos. Contacta soporte.');
+    } finally {
+      setPurging(false);
     }
   };
 
@@ -413,6 +446,54 @@ export const Configuracion: React.FC = () => {
           </div>
         </div>
 
+      </div>
+
+      {/* Danger Zone: Self Purge */}
+      <div className="border border-red-900/50 rounded-2xl bg-red-950/10 p-6 space-y-4 mt-4">
+        <div className="flex items-center space-x-2 pb-2 border-b border-red-900/40">
+          <AlertTriangle className="h-5 w-5 text-red-500 animate-pulse" />
+          <h3 className="text-lg font-bold text-red-400">Zona de Peligro — Baja y Purga de Datos</h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          <div className="space-y-2">
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Puedes cancelar tu suscripción y solicitar la <strong className="text-red-400">eliminación permanente e irreversible</strong> de todos tus datos del sistema en cualquier momento durante el período de prueba (o posterior).
+            </p>
+            <ul className="text-xs text-slate-500 space-y-1 list-none">
+              {[
+                'Pedidos, remitos y comprobantes',
+                'Clientes, productos y listas de precios',
+                'Rutas de reparto y choferes',
+                'Cuentas corrientes y movimientos de caja',
+                'Usuarios y configuraciones del sistema',
+                'La empresa completa (este tenant)',
+              ].map((item) => (
+                <li key={item} className="flex items-center space-x-2">
+                  <Trash2 className="h-3 w-3 text-red-700 flex-shrink-0" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[10px] text-red-400/80 font-semibold mt-2">
+              ⚠️ Esta operación NO tiene marcha atrás. Requiere doble confirmación explícita.
+            </p>
+          </div>
+
+          <div className="flex flex-col justify-center space-y-3">
+            <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-4 text-xs text-red-300/80 leading-relaxed">
+              Al confirmar la baja, tu sesión se cerrará automáticamente y tus datos serán purgados del servidor de forma inmediata. No podrás recuperar ninguna información.
+            </div>
+            <button
+              onClick={handlePurgeSelf}
+              disabled={purging}
+              className="w-full py-3 bg-red-700/20 hover:bg-red-700/40 border border-red-700/50 hover:border-red-500 text-red-400 hover:text-red-300 font-bold text-sm rounded-xl shadow transition disabled:opacity-50 flex items-center justify-center space-x-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>{purging ? 'Eliminando datos...' : 'Eliminar empresa y purgar todos los datos'}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

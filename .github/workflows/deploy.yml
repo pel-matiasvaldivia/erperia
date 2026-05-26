@@ -7,10 +7,10 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/pel-matiasvaldivia/frigo-backend
-  FRONTEND_IMAGE: ghcr.io/pel-matiasvaldivia/frigo-frontend
-  NGINX_IMAGE: ghcr.io/pel-matiasvaldivia/frigo-nginx
-  WHATSAPP_IMAGE: ghcr.io/pel-matiasvaldivia/frigo-whatsapp
+  BACKEND_IMAGE: ghcr.io/pel-matiasvaldivia/erperia-backend
+  FRONTEND_IMAGE: ghcr.io/pel-matiasvaldivia/erperia-frontend
+  NGINX_IMAGE: ghcr.io/pel-matiasvaldivia/erperia-nginx
+  WHATSAPP_IMAGE: ghcr.io/pel-matiasvaldivia/erperia-whatsapp
 
 jobs:
   build-and-push:

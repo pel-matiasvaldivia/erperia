@@ -8,17 +8,17 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: '#fff1f2',
-          100: '#ffe4e6',
-          200: '#fecdd3',
-          300: '#fda4af',
-          400: '#fb7185',
-          500: '#ef4444', // Red 500
-          600: '#dc2626', // Red 600 - Traditional Primary
-          700: '#b91c1c',
-          800: '#991b1b',
-          900: '#7f1d1d',
-          950: '#450a0a',
+          50: 'var(--color-brand-50, #fff1f2)',
+          100: 'var(--color-brand-100, #ffe4e6)',
+          200: 'var(--color-brand-200, #fecdd3)',
+          300: 'var(--color-brand-300, #fda4af)',
+          400: 'var(--color-brand-400, #fb7185)',
+          500: 'var(--color-brand-500, #ef4444)', // Red 500
+          600: 'var(--color-brand-600, #dc2626)', // Red 600 - Traditional Primary
+          700: 'var(--color-brand-700, #b91c1c)',
+          800: 'var(--color-brand-800, #991b1b)',
+          900: 'var(--color-brand-900, #7f1d1d)',
+          950: 'var(--color-brand-950, #450a0a)',
         },
         'accent-brown': {
           50: '#fdf8f6',
