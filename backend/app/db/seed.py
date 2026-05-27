@@ -100,9 +100,11 @@ def seed_tenant_data(db: Session, tenant_id: int):
         print(f"✅ Seeding de nuevo tenant completado para ID {tenant_id} ({tenant.razon_social})")
         return
 
-    # Check / Create Tenant Admin (renamed from SUPERADMIN)
-    suffix = f"_{tenant.slug}" if tenant_id != 1 else ""
-    t_admin_email = f"admin{suffix}@erperia.com.ar" if tenant_id != 1 else "admin@erperia.com.ar"
+    # Determine admin email consistently with auth.py
+    domain_name = tenant.nombre_fantasia if tenant.nombre_fantasia else tenant.razon_social
+    sanitized_domain = sanitize_domain_name(domain_name)
+    t_admin_email = f"sysadmin@{sanitized_domain}.com.ar" if tenant_id != 1 or tenant.slug != 'je-cerdos' else "admin@erperia.com.ar"
+    
     t_admin = db.query(Usuario).filter(Usuario.email == t_admin_email, Usuario.tenant_id == tenant_id).first()
     if not t_admin:
         t_admin = Usuario(
