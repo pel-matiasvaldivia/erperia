@@ -17,9 +17,14 @@ from app.routers import (
 # 1. Initialize DB and Seed Data
 try:
     print("Iniciando y migrando base de datos...")
+    # Primero creamos todas las tablas definidas en los modelos (incluyendo 'tenants')
+    Base.metadata.create_all(bind=engine)
+    
+    # Luego corremos las migraciones manuales (que ahora encontrarán las tablas creadas)
     from app.db.migrate import run_migrations
     run_migrations()
-    Base.metadata.create_all(bind=engine)
+    
+    # Finalmente el seeding
     seed_db()
 except Exception as e:
     print(f"Error al iniciar base de datos: {e}")

@@ -77,10 +77,18 @@ def run_migrations():
             col_res = conn.execute(text(check_col_sql)).fetchone()
             
             if not col_res:
-                print(f"[Migration] Agregando columna tenant_id a la tabla '{tabla}'...")
-                # 1. Agregar columna como nullable primero
-                alter_sql = f"ALTER TABLE {tabla} ADD COLUMN tenant_id INTEGER REFERENCES tenants(id);"
-                conn.execute(text(alter_sql))
+                # Verificar si la tabla existe antes de intentar alterarla
+                check_table_sql = f"SELECT 1 FROM information_schema.tables WHERE table_name = '{tabla}';"
+                table_res = conn.execute(text(check_table_sql)).fetchone()
+                
+                if table_res:
+                    print(f"[Migration] Agregando columna tenant_id a la tabla '{tabla}'...")
+                    # 1. Agregar columna como nullable primero
+                    alter_sql = f"ALTER TABLE {tabla} ADD COLUMN tenant_id INTEGER REFERENCES tenants(id);"
+                    conn.execute(text(alter_sql))
+                else:
+                    print(f"[Migration] Omitiendo tabla '{tabla}' porque no existe en el esquema.")
+                    continue
                 
                 # 2. Inicializar con tenant_id = 1
                 update_sql = f"UPDATE {tabla} SET tenant_id = 1;"
