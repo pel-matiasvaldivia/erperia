@@ -102,6 +102,16 @@ services:
     depends_on:
       - backend
 
+  watchtower:
+    image: containrrr/watchtower
+    container_name: erperia-watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+
 volumes:
   pgdata:
   redisdata:
