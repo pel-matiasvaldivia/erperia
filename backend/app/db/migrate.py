@@ -169,7 +169,10 @@ def run_migrations():
         campos_tenant = [
             ("whatsapp_numero", "VARCHAR(30)"),
             ("whatsapp_activo", "BOOLEAN DEFAULT FALSE"),
-            ("punto_venta", "VARCHAR(4) DEFAULT '0001'")
+            ("punto_venta", "VARCHAR(4) DEFAULT '0001'"),
+            ("onboarding_completado", "BOOLEAN DEFAULT FALSE"),
+            ("fecha_alta", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+            ("fecha_vencimiento", "TIMESTAMP")
         ]
         for col, col_type in campos_tenant:
             check_col = conn.execute(text(f"SELECT column_name FROM information_schema.columns WHERE table_name = 'tenants' AND column_name = '{col}';")).fetchone()
