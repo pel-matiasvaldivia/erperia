@@ -246,3 +246,33 @@ def purge_self_tenant(
         )
         
     return {"message": "Tenant y todos sus datos relacionados eliminados exitosamente"}
+
+
+@router.post("/suscripcion/activar")
+def activar_plan(
+    plan: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(tenant_admin_only),
+    tenant: Tenant = Depends(get_current_tenant)
+):
+    """
+    Activa un plan específico para el tenant (ficticio/demo para propósitos de este ERP).
+    Extiende la fecha de vencimiento 30 días.
+    """
+    if plan not in ["basico", "profesional", "enterprise"]:
+        raise HTTPException(status_code=400, detail="Plan no reconocido")
+    
+    tenant.plan = plan
+    
+    # Extendemos la fecha de vencimiento 30 días desde hoy
+    from datetime import datetime, timedelta
+    tenant.fecha_vencimiento = datetime.utcnow() + timedelta(days=30)
+    
+    db.commit()
+    db.refresh(tenant)
+    
+    return {
+        "status": "ok",
+        "plan": tenant.plan,
+        "fecha_vencimiento": tenant.fecha_vencimiento.isoformat() if tenant.fecha_vencimiento else None
+    }

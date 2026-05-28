@@ -143,6 +143,7 @@ export const configuracionAPI = {
   update: async (clave: string, valor: string) => (await api.put(`/configuracion/${clave}`, { valor })).data,
   getEmpresa: async () => (await api.get('/configuracion/empresa')).data,
   purgeSelf: async () => (await api.delete('/configuracion/tenant/purge-self')).data,
+  activarSuscripcion: async (plan: string) => (await api.post('/configuracion/suscripcion/activar', null, { params: { plan } })).data,
 };
 
 export const platformAdminAPI = {
