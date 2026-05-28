@@ -44,6 +44,28 @@ export const OnboardingWizard: React.FC = () => {
   });
   const [addingUser, setAddingUser] = useState(false);
 
+  // Load existing data from signup
+  React.useEffect(() => {
+    const fetchEmpresaData = async () => {
+      try {
+        const res = await api.get('/onboarding/empresa');
+        setEmpresaData({
+          razon_social: res.data.razon_social || '',
+          nombre_fantasia: res.data.nombre_fantasia || '',
+          direccion: res.data.direccion || '',
+          ciudad: res.data.ciudad || '',
+          provincia: res.data.provincia || '',
+          telefono: res.data.telefono || '',
+          email: res.data.email || '',
+          color_primario: res.data.color_primario || '#dc2626'
+        });
+      } catch (err) {
+        console.error('Error fetching onboarding data', err);
+      }
+    };
+    fetchEmpresaData();
+  }, []);
+
   // Step 3 & 4: File upload state
   const [productsFile, setProductsFile] = useState<File | null>(null);
   const [productsCount, setProductsCount] = useState<number | null>(null);

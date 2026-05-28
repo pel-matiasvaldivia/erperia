@@ -36,6 +36,28 @@ class EmpleadoCreate(BaseModel):
     password: str
     rol: str # ADMINISTRATIVO, VENDEDOR, REPARTIDOR, DESPACHANTE, PRODUCCION
 
+@router.get("/empresa")
+def get_empresa_onboarding(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(admin_only),
+    tenant: Tenant = Depends(get_current_tenant)
+):
+    """
+    Fetch current company profile to pre-fill the onboarding form
+    """
+    return {
+        "razon_social": tenant.razon_social,
+        "nombre_fantasia": tenant.nombre_fantasia,
+        "direccion": tenant.direccion,
+        "ciudad": tenant.ciudad,
+        "provincia": tenant.provincia,
+        "pais": tenant.pais,
+        "codigo_postal": tenant.codigo_postal,
+        "telefono": tenant.telefono,
+        "email": tenant.email,
+        "color_primario": tenant.color_primario or "#dc2626"
+    }
+
 @router.post("/empresa")
 def update_empresa_onboarding(
     data: EmpresaUpdate,
