@@ -101,6 +101,7 @@ def seed_tenant_data(db: Session, tenant_id: int):
         return
 
     # Determine admin email consistently with auth.py
+    suffix = f"_{tenant.slug}" if tenant_id != 1 else ""
     domain_name = tenant.nombre_fantasia if tenant.nombre_fantasia else tenant.razon_social
     sanitized_domain = sanitize_domain_name(domain_name)
     t_admin_email = f"sysadmin@{sanitized_domain}.com.ar" if tenant_id != 1 or tenant.slug != 'je-cerdos' else "admin@erperia.com.ar"
